@@ -1,11 +1,112 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Mon site</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La Phrase : une seule phrase, un seul propriétaire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#1730d6; --ink:#fff; --soft:#b9c3ff; --gold:#ffd23f; --night:#0b1659; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; }
+  body { background:var(--bg); color:var(--ink); font-family:"Bricolage Grotesque",system-ui,sans-serif; min-height:100vh; display:flex; flex-direction:column; padding:clamp(16px,4vw,48px); }
+  .owner { font-size:1.05rem; color:var(--soft); max-width:60ch; }
+  .owner b { color:var(--ink); font-weight:800; }
+  main { flex:1; display:flex; align-items:center; padding:6vh 0; }
+  #sentence { margin:0; font-weight:800; line-height:.95; letter-spacing:-.03em; font-size:clamp(2.6rem,10.5vw,9rem); overflow-wrap:anywhere; }
+  #sentence.preview { color:var(--gold); }
+  .bid { background:var(--night); border-radius:18px; padding:clamp(16px,3vw,28px); display:grid; gap:14px; max-width:760px; }
+  .bid p { margin:0; font-size:1.1rem; }
+  .price { color:var(--gold); font-weight:800; font-size:1.5rem; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  input { flex:1 1 280px; font:inherit; font-size:1.1rem; padding:14px 16px; border-radius:12px; border:2px solid transparent; background:#fff; color:#0b1659; }
+  input:focus-visible, button:focus-visible, a:focus-visible { outline:3px solid var(--gold); outline-offset:3px; }
+  button { font:inherit; font-weight:800; font-size:1.1rem; padding:14px 22px; border:0; border-radius:12px; background:var(--gold); color:var(--night); cursor:pointer; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .hint { font-size:.9rem; color:var(--soft); }
+  .hint a { color:var(--ink); }
+  .hist { margin-top:40px; max-width:760px; }
+  .hist h2 { font-size:1.1rem; margin:0 0 10px; }
+  .hist ol { list-style:none; margin:0; padding:0; }
+  .hist li { display:flex; justify-content:space-between; gap:16px; padding:10px 0; border-top:1px solid rgba(255,255,255,.25); color:var(--soft); }
+  .hist li span:first-child { color:var(--ink); }
+  @media (prefers-reduced-motion:no-preference) { #sentence { transition:color .2s; } }
+</style>
 </head>
 <body>
-  <h1>Hello, bonjour !</h1>
+
+<p class="owner">Cette phrase appartient à <b id="author"></b> depuis <b id="timer"></b>.</p>
+
+<main><h1 id="sentence"></h1></main>
+
+<section class="bid" aria-labelledby="bidtitle">
+  <p id="bidtitle">Pour la remplacer, il suffit de payer <span class="price" id="next"></span>.</p>
+  <div class="row">
+    <input id="txt" maxlength="80" placeholder="Écris ta phrase (80 caractères max)" autocomplete="off">
+    <button id="pay" disabled>Acheter la phrase</button>
+  </div>
+  <p class="hint">Ta phrase s’affiche en jaune ci-dessus en avant-première. Après le paiement PayPal, <a id="mail" href="#">envoie-la par mail</a> : elle est mise en ligne dans la journée, et le prix monte de 1 €.</p>
+</section>
+
+<section class="hist" aria-labelledby="histtitle">
+  <h2 id="histtitle">Cette page a déjà rapporté <span id="total"></span></h2>
+  <ol id="hist"></ol>
+</section>
+
+<script>
+/* ====== À MODIFIER À CHAQUE NOUVEL ACHAT (puis git push) ====== */
+const CONFIG = {
+  paypalUser: "TON_PSEUDO_PAYPAL",        // ton identifiant paypal.me
+  email: "ton-email@exemple.com",         // où les acheteurs t’envoient leur phrase
+  current: { text: "Ici, bientôt, ta phrase.", author: "Félix", price: 1, since: "2026-11-06T12:00:00" },
+  history: [
+    // { text: "Ancienne phrase", author: "Nom", price: 1 }
+  ]
+};
+/* =============================================================== */
+
+const $ = id => document.getElementById(id);
+const cur = CONFIG.current;
+const next = cur.price + 1;
+const eur = n => n.toLocaleString("fr-FR") + " €";
+
+$("sentence").textContent = cur.text;
+$("author").textContent = cur.author;
+$("next").textContent = eur(next);
+$("total").textContent = eur(cur.price + CONFIG.history.reduce((s, h) => s + h.price, 0));
+
+CONFIG.history.slice().reverse().forEach(h => {
+  const li = document.createElement("li");
+  const a = document.createElement("span"); a.textContent = "« " + h.text + " » " + h.author;
+  const b = document.createElement("span"); b.textContent = eur(h.price);
+  li.append(a, b); $("hist").append(li);
+});
+
+function tick() {
+  let s = Math.max(0, Math.floor((Date.now() - new Date(cur.since)) / 1000));
+  const d = Math.floor(s / 86400); s %= 86400;
+  const h = Math.floor(s / 3600); s %= 3600;
+  const m = Math.floor(s / 60); s %= 60;
+  $("timer").textContent = (d ? d + " j " : "") + h + " h " + m + " min " + s + " s";
+}
+tick(); setInterval(tick, 1000);
+
+$("txt").addEventListener("input", e => {
+  const v = e.target.value.trim();
+  $("sentence").textContent = v || cur.text;
+  $("sentence").classList.toggle("preview", !!v);
+  $("pay").disabled = !v;
+  $("mail").href = "mailto:" + CONFIG.email + "?subject=" + encodeURIComponent("Ma phrase pour La Phrase")
+    + "&body=" + encodeURIComponent("Ma phrase : " + v + "\nMon nom affiché : \nPaiement de " + next + " € effectué.");
+});
+
+$("pay").addEventListener("click", () => {
+  const v = $("txt").value.trim();
+  if (!v) return;
+  try { navigator.clipboard.writeText(v); } catch (e) {}
+  window.open("https://paypal.me/" + CONFIG.paypalUser + "/" + next + "EUR", "_blank", "noopener");
+});
+</script>
 </body>
 </html>
-
